@@ -3,6 +3,7 @@ import sys
 import os.path
 import urllib.request
 import threading
+import requests
 
 if len(sys.argv) == 1:
     print('You did not specify a manifest.json! Exiting...')
@@ -18,31 +19,55 @@ data = json.load(json_data)
 json_data.close()
 
 def download_file(element):
+    # Check if 'projectID' and 'fileID' are present in the element
+    if 'projectID' not in element or 'fileID' not in element:
+        print("Missing projectID or fileID in element:", element)
+        return
+
     projectID = str(element['projectID'])
     fileID = str(element['fileID'])
 
-    url = f'https://minecraft.curseforge.com/projects/{projectID}/files/{fileID}/download'
-    print(url)
+    print(projectID)
+    print(fileID)
 
-    # Setting a user-agent because CurseForge doesn't allow us to download mods directly
-    opener = urllib.request.build_opener()
-    opener.addheaders = [('User-Agent',
-                          'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/36.0.1941.0 Safari/537.36')]
-    urllib.request.install_opener(opener)
+    url = f'https://api.curse.tools/v1/cf/mods/{projectID}/files/{fileID}/download-url'
     
-    filename, _ = urllib.request.urlretrieve(url)
-    print(f"Downloaded file: {filename}")
-    
-    # Use a context manager for file writing
-    with open(f"{filename}.url.txt", 'w') as f:
-        f.write(url)
+    try:
+        # Set a User-Agent header
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        req = urllib.request.Request(url, headers=headers)
+        
+        # Fetch the JSON response to get the raw download URL
+        with urllib.request.urlopen(req) as response:
+            download_info = json.load(response)
+            raw_download_url = download_info['data']  # Extract the raw download URL
+
+        # Use the raw download URL to download the file
+        response = requests.get(raw_download_url)  # Use requests to get the file
+        filename = os.path.basename(raw_download_url)  # Extract filename from the URL
+        with open(filename, 'wb') as f:  # Open the file in binary write mode
+            f.write(response.content)  # Write the content to the file
+        print(f"Downloaded file: {filename}")
+        
+        # Use a context manager for file writing
+        with open(f"{filename}.url.txt", 'w') as f:
+            f.write(raw_download_url)
+    except urllib.error.HTTPError as e:
+        print(f"HTTP Error: {e.code} for URL: {url}")
+    except Exception as e:
+        print(f"An error occurred: {e}")
+
+# Create a list to hold threads
+threads = []
 
 for element in data['files']:
+    # Create a new thread for each download
     thread = threading.Thread(target=download_file, args=(element,))
-    thread.start()
+    threads.append(thread)  # Add the thread to the list
+    thread.start()  # Start the thread
 
-for thread in threading.enumerate():
-    if thread is not threading.main_thread():
-        thread.join()
+# Wait for all threads to complete
+for thread in threads:
+    thread.join()
 
 print("Done!")
