@@ -4,6 +4,7 @@ import os.path
 import urllib.request
 import threading
 import requests
+from urllib.parse import unquote
 
 if len(sys.argv) == 1:
     print('You did not specify a manifest.json! Exiting...')
@@ -27,9 +28,6 @@ def download_file(element):
     projectID = str(element['projectID'])
     fileID = str(element['fileID'])
 
-    print(projectID)
-    print(fileID)
-
     url = f'https://api.curse.tools/v1/cf/mods/{projectID}/files/{fileID}/download-url'
     
     try:
@@ -41,6 +39,9 @@ def download_file(element):
         with urllib.request.urlopen(req) as response:
             download_info = json.load(response)
             raw_download_url = download_info['data']  # Extract the raw download URL
+            
+            # Decode the URL to handle encoded characters
+            raw_download_url = unquote(raw_download_url)  # Decode the URL
 
         # Use the raw download URL to download the file
         response = requests.get(raw_download_url)  # Use requests to get the file
