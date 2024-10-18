@@ -43,9 +43,14 @@ def download_file(element):
             # Decode the URL to handle encoded characters
             raw_download_url = unquote(raw_download_url)  # Decode the URL
 
+        # Check if the file already exists
+        filename = os.path.basename(raw_download_url)  # Extract filename from the URL
+        if os.path.isfile(filename):
+            print(f"File already exists: {filename}. Skipping download.")
+            return  # Skip downloading if the file exists
+
         # Use the raw download URL to download the file
         response = requests.get(raw_download_url)  # Use requests to get the file
-        filename = os.path.basename(raw_download_url)  # Extract filename from the URL
         with open(filename, 'wb') as f:  # Open the file in binary write mode
             f.write(response.content)  # Write the content to the file
         print(f"Downloaded file: {filename}")
@@ -71,4 +76,6 @@ for element in data['files']:
 for thread in threads:
     thread.join()
 
-print("Done!")
+# Ensure proper termination
+if all(not thread.is_alive() for thread in threads):
+    print("Done!")
